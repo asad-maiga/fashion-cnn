@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="FashionCNN classifies grayscale clothing images into 10 Fashion-MNIST categories directly in your browser using ONNX Runtime Web.">
+  <meta name="theme-color" content="#DCE8E2">
+  <title>FashionCNN — Clothing Image Classifier</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/ort.min.js" defer></script>
+  <script src="scripts.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#classifier">Skip to classifier</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="#classifier">FashionCNN</a>
+
+      <div class="header-right">
+        <nav aria-label="Primary">
+          <ul class="nav-list">
+            <li><a href="#classifier">Classifier</a></li>
+            <li><a href="#about">About</a></li>
+            <li>
+              <a
+                href="https://github.com/asad-maiga/fashion-cnn"
+                target="_blank"
+                rel="noopener noreferrer"
+              >GitHub</a>
+            </li>
+          </ul>
+        </nav>
+
+        <div class="model-status" role="status" aria-live="polite" id="model-status">
+          <span class="status-dot" data-state="loading" aria-hidden="true"></span>
+          <span id="model-status-text">Loading model&hellip;</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="classifier" class="container section-classifier" aria-labelledby="page-title">
+      <div class="page-heading">
+        <h1 id="page-title">Clothing Image Classifier</h1>
+        <p class="page-subtitle">
+          Upload an image or load the sample ankle boot to classify it into 10 Fashion-MNIST categories directly in your browser.
+        </p>
+      </div>
+
+      <div class="classifier-grid">
+        <section class="surface-panel" aria-labelledby="upload-heading">
+          <h2 id="upload-heading" class="panel-title">Upload &amp; Preview</h2>
+
+          <div id="drop-zone" class="drop-zone">
+            <input
+              id="file-input"
+              class="visually-hidden"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,image/bmp"
+            >
+            <p class="drop-message" id="drop-trigger">
+              Drag and drop an image here, or choose a file from your device
+            </p>
+            <p class="drop-formats">PNG, JPEG, WebP, GIF, or BMP up to 10&nbsp;MB</p>
+            <div class="drop-buttons">
+              <button type="button" id="browse-btn" class="btn btn-secondary">
+                Choose image
+              </button>
+              <button type="button" id="sample-btn" class="btn btn-soft">
+                Try sample image
+              </button>
+            </div>
+          </div>
+
+          <p id="input-error" class="inline-error" role="alert" hidden></p>
+
+          <div id="preview-section" class="preview-section" hidden>
+            <div class="preview-header">
+              <div class="view-toggle" role="group" aria-label="Image preview mode">
+                <button
+                  type="button"
+                  id="view-original-btn"
+                  class="toggle-btn"
+                  aria-pressed="true"
+                >Original</button>
+                <button
+                  type="button"
+                  id="view-tensor-btn"
+                  class="toggle-btn"
+                  aria-pressed="false"
+                >28&times;28 grayscale</button>
+              </div>
+              <span id="preview-meta" class="preview-meta">&mdash;</span>
+            </div>
+
+            <div class="preview-frame">
+              <img
+                id="source-preview"
+                class="preview-image"
+                src=""
+                alt="Uploaded clothing image preview"
+                width="180"
+                height="180"
+              >
+              <canvas
+                id="tensor-preview"
+                class="preview-tensor"
+                width="28"
+                height="28"
+                aria-label="Preprocessed 28 by 28 grayscale model input"
+                hidden
+              ></canvas>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button type="button" id="clear-btn" class="btn btn-ghost" disabled>
+              Clear
+            </button>
+            <button type="button" id="classify-btn" class="btn btn-primary" disabled>
+              Classify image
+            </button>
+          </div>
+        </section>
+
+        <section class="surface-panel" aria-labelledby="results-heading">
+          <div class="results-header">
+            <h2 id="results-heading" class="panel-title">Prediction</h2>
+            <span id="inference-time" class="latency-note" hidden></span>
+          </div>
+
+          <div id="result-empty" class="state-message">
+            <p class="state-title">No image selected</p>
+            <p class="state-body">
+              Start by uploading an image or trying the built-in ankle boot sample, then select <strong>Classify image</strong>.
+            </p>
+          </div>
+
+          <div id="result-ready" class="state-message" hidden>
+            <p class="state-title">Ready to classify</p>
+            <p class="state-body">
+              Your image has been resized to 28&times;28 grayscale. Select <strong>Classify image</strong> to view the predicted category and class probabilities.
+            </p>
+          </div>
+
+          <div id="result-loading" class="state-message" hidden>
+            <p class="state-title">Classifying image&hellip;</p>
+            <progress class="loading-bar" aria-label="Running clothing classification"></progress>
+            <p class="state-body">
+              Running the model locally in your browser.
+            </p>
+          </div>
+
+          <div id="result-error" class="state-message state-error" role="alert" hidden>
+            <p class="state-title">Something went wrong</p>
+            <p id="result-error-text" class="state-body"></p>
+            <button type="button" id="retry-model-btn" class="btn btn-secondary" hidden>
+              Retry loading model
+            </button>
+          </div>
+
+          <div id="result-output" class="result-output" aria-live="polite" hidden>
+            <div class="prediction-summary">
+              <div>
+                <p class="summary-caption">Predicted category</p>
+                <p id="predicted-label" class="predicted-label">&mdash;</p>
+              </div>
+              <div class="summary-right">
+                <p class="summary-caption">Model probability</p>
+                <p id="predicted-confidence" class="predicted-probability">&mdash;</p>
+              </div>
+            </div>
+
+            <div class="distribution-header">
+              <h3>Class probabilities</h3>
+              <span>All 10 categories</span>
+            </div>
+
+            <ol id="probability-list" class="probability-list"></ol>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="about" class="container section-about" aria-labelledby="about-heading">
+      <div class="about-panel">
+        <div class="about-text">
+          <h2 id="about-heading" class="panel-title">About this model</h2>
+          <p>
+            FashionCNN is a custom Convolutional Neural Network trained with PyTorch on the Fashion-MNIST dataset. Each input image is resized to 28&times;28 grayscale pixels, normalized to [0, 1], and evaluated directly in your browser using ONNX Runtime Web with no server upload.
+          </p>
+          <p class="disclaimer">
+            <strong>Note:</strong> This model was trained on centered 28&times;28 Fashion-MNIST clothing silhouettes and achieves approximately 89% test accuracy on that dataset. Predictions on ordinary photographs of clothing may be unreliable.
+          </p>
+        </div>
+
+        <dl class="about-facts">
+          <div class="fact-item">
+            <dt>Model</dt>
+            <dd>Custom PyTorch CNN (ONNX)</dd>
+          </div>
+          <div class="fact-item">
+            <dt>Dataset</dt>
+            <dd>Fashion-MNIST (10 classes)</dd>
+          </div>
+          <div class="fact-item">
+            <dt>Input</dt>
+            <dd>28&times;28 grayscale</dd>
+          </div>
+          <div class="fact-item">
+            <dt>Test accuracy</dt>
+            <dd>~89%</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>FashionCNN</span>
+      <a
+        href="https://github.com/asad-maiga/fashion-cnn"
+        target="_blank"
+        rel="noopener noreferrer"
+      >github.com/asad-maiga/fashion-cnn</a>
+    </div>
+  </footer>
+</body>
+</html>
